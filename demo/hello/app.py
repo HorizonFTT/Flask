@@ -9,6 +9,9 @@ from flask import (
     session,
     request,
 )
+from urllib.parse import urlparse, urljoin
+from jinja2.utils import generate_lorem_ipsum
+
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'secret string')
 
@@ -54,8 +57,8 @@ def fuck():
     return redirect(url_for('hello'))
 
 
-@app.route('/foo')
-def foo():
+@app.route('/json')
+def json():
     return jsonify(name='Grey Li', gender='male')
 
 
@@ -77,3 +80,64 @@ def logout():
     if 'logged_in' in session:
         session.pop('logged_in')
         return redirect(url_for('hello'))
+
+
+@app.route('/foo')
+def foo():
+    r = f'<h1>Foo page</h1><a href="{url_for("do_something", next=request.full_path)}">Do something and redirect</a>'
+    return r
+
+
+@app.route('/bar')
+def bar():
+    return f'<h1>Bar page</h1><a href="{url_for("do_something", next=request.full_path)}">Do something and redirect</a>'
+
+
+@app.route('/do_something')
+def do_something():
+    # do something here
+    return redirect_back()
+
+
+def is_safe_url(target):
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return test_url.scheme in ('http', 'https') and \
+        ref_url.netloc == test_url.netloc
+
+
+def redirect_back(default='hello', **kwargs):
+    for target in request.args.get('next'), request.referrer:
+        if not target:
+            continue
+        if is_safe_url(target):
+            return redirect(target)
+    return redirect(url_for(default, **kwargs))
+
+
+@app.route('/post')
+def show_post():
+    post_body = generate_lorem_ipsum(n=2)
+    return '''
+<h1>A very long post</h1>
+<div class="body">%s</div>
+<button id="load">Load More</button>
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+<script type="text/javascript">
+$(function() {
+    $('#load').click(function() {
+        $.ajax({
+            url: '/more',
+            type: 'get',
+            success: function(data){
+                $('.body').append(data);
+            }
+        })
+    })
+})
+</script>''' % post_body
+
+
+@app.route('/more')
+def load_post():
+    return generate_lorem_ipsum(n=1)
