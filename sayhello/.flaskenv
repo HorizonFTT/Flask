@@ -1,2 +1,2 @@
-FLASK_APP=app
+FLASK_APP=sayhello
 FLASK_ENV=development
